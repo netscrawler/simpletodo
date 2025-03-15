@@ -1,0 +1,46 @@
+
+services:
+  htmxtst:
+      build: .
+      container_name: htmxtst
+      ports:
+        - "8080:8080"
+      environment:
+        # енвы подключения к БД
+        - DATABASE_PORT=5432
+        - DATABASE_USER=postgres
+        - DATABASE_PASSWORD=postgres
+        - DATABASE_NAME=htmxtst
+        - DATABASE_HOST=db
+        # порт сервиса
+        - SERVER_PORT=8080
+        - SERVER_HOST=0.0.0.0
+      depends_on:
+        db:
+            condition: service_healthy
+      networks:
+        - internal
+  db:
+    image: postgres:latest
+    container_name: db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: htmxtst
+    ports:
+      - "5432:5432"
+    command: postgres
+    volumes:
+      - ./migrations/init.sql/:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+
+networks:
+  internal:
+    name: htmxtst
