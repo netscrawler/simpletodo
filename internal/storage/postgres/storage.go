@@ -23,18 +23,24 @@ func New(log *zap.Logger) *Storage {
 
 func (s *Storage) Init(ctx context.Context, connectionString string) error {
 	const op = "storage.postgres.Init"
+
 	var err error
+
 	s.Pool, err = pgxpool.Connect(ctx, connectionString)
 	if err != nil {
 		s.log.Error(op, zap.Error(err))
+
 		return fmt.Errorf("%s : %w", op, err)
 	}
 
 	if err := s.Pool.Ping(ctx); err != nil {
 		s.log.Error(op, zap.Error(err))
+
 		return fmt.Errorf("%s : %w", op, err)
 	}
-	s.log.Info(fmt.Sprintf("%s : successfully connected", op))
+
+	s.log.Info(op + " : successfully connected")
+
 	return nil
 }
 

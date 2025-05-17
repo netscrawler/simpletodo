@@ -2,6 +2,8 @@ package model
 
 import "errors"
 
-var ErrInvalidID = errors.New("invalid id")
-var ErrNotFound = errors.New("not found")
-var ErrInvalidTask = errors.New("invalid task")
+var (
+	ErrInvalidID   = errors.New("invalid id")
+	ErrNotFound    = errors.New("not found")
+	ErrInvalidTask = errors.New("invalid task")
+)

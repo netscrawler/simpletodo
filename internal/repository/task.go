@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"simpletodo/internal/model"
 	"simpletodo/internal/storage/postgres"
 
@@ -23,20 +24,24 @@ func NewTaskRepository(storage *postgres.Storage, log *zap.Logger) *Task {
 
 func (t *Task) Create(ctx context.Context, task *model.Task) error {
 	const op = "repository.task.Create"
+
 	query, args, err := t.storage.Builder.Insert("tasks").
 		Columns("title", "done").
 		Values(task.Title, task.Done).
 		ToSql()
 	if err != nil {
 		t.log.Error(op, zap.Error(err))
+
 		return fmt.Errorf("%s : %w", op, err)
 	}
 
 	_, err = t.storage.Pool.Exec(ctx, query, args...)
 	if err != nil {
 		t.log.Error(op, zap.Error(err))
+
 		return fmt.Errorf("%s : %w", op, err)
 	}
+
 	return nil
 }
 
@@ -45,6 +50,7 @@ func (t *Task) GetByID(ctx context.Context, id int) (*model.Task, error) {
 
 	if id == 0 {
 		t.log.Error(op, zap.Error(model.ErrInvalidID))
+
 		return nil, model.ErrInvalidID
 	}
 
@@ -55,6 +61,7 @@ func (t *Task) GetByID(ctx context.Context, id int) (*model.Task, error) {
 		ToSql()
 	if err != nil {
 		t.log.Error(op, zap.Error(err))
+
 		return nil, fmt.Errorf("%s : %w", op, err)
 	}
 
@@ -65,48 +72,68 @@ func (t *Task) GetByID(ctx context.Context, id int) (*model.Task, error) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			t.log.Error(op, zap.Error(model.ErrNotFound))
+
 			return nil, model.ErrNotFound
 		}
+
 		t.log.Error(op, zap.Error(err))
+
 		return nil, fmt.Errorf("%s : %w", op, err)
 	}
+
 	t.log.Info(fmt.Sprintf("%s : successfully got task with id %d", op, id))
+
 	return &task, nil
 }
 
 func (t *Task) GetAll(ctx context.Context) ([]model.Task, error) {
 	const op = "repository.task.GetAll"
-	t.log.Info(fmt.Sprintf("%s : getting tasks", op))
+
+	t.log.Info(op + " : getting tasks")
+
 	query, args, err := t.storage.Builder.
 		Select("id", "title", "done").
 		From("tasks").
 		ToSql()
 	if err != nil {
 		t.log.Error(op, zap.Error(err))
+
 		return nil, fmt.Errorf("%s : %w", op, err)
 	}
 
 	rows, err := t.storage.Pool.Query(ctx, query, args...)
-	defer rows.Close()
+
+	defer func() {
+		rows.Close()
+	}()
+
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			t.log.Error(op, zap.Error(model.ErrNotFound))
+
 			return nil, model.ErrNotFound
 		}
+
 		t.log.Error(op, zap.Error(err))
+
 		return nil, fmt.Errorf("%s : %w", op, err)
 	}
 
-	var tasks = make([]model.Task, 0)
+	tasks := make([]model.Task, 0)
+
 	for rows.Next() {
 		var task model.Task
 		if err := rows.Scan(&task.ID, &task.Title, &task.Done); err != nil {
 			t.log.Error(op, zap.Error(err))
+
 			return nil, fmt.Errorf("%s : %w", op, err)
 		}
+
 		tasks = append(tasks, task)
 	}
+
 	t.log.Info(fmt.Sprintf("%s : successfully got %d tasks", op, len(tasks)))
+
 	return tasks, nil
 }
 
@@ -115,11 +142,13 @@ func (t *Task) Update(ctx context.Context, task *model.Task) error {
 
 	if task == nil {
 		t.log.Error(op, zap.Error(model.ErrInvalidTask))
+
 		return model.ErrInvalidTask
 	}
 
 	if task.ID == 0 {
 		t.log.Error(op, zap.Error(model.ErrInvalidID))
+
 		return model.ErrInvalidID
 	}
 
@@ -130,19 +159,25 @@ func (t *Task) Update(ctx context.Context, task *model.Task) error {
 		ToSql()
 	if err != nil {
 		t.log.Error(op, zap.Error(err))
+
 		return fmt.Errorf("%s : %w", op, err)
 	}
 
 	cmdTag, err := t.storage.Pool.Exec(ctx, query, args...)
 	if cmdTag.RowsAffected() == 0 {
 		t.log.Error(op, zap.Error(model.ErrNotFound))
+
 		return model.ErrNotFound
 	}
+
 	if err != nil {
 		t.log.Error(op, zap.Error(err))
+
 		return fmt.Errorf("%s : %w", op, err)
 	}
+
 	t.log.Info(fmt.Sprintf("%s :updated %d task with id %d", op, cmdTag.RowsAffected(), task.ID))
+
 	return nil
 }
 
@@ -151,6 +186,7 @@ func (t *Task) Delete(ctx context.Context, id int) error {
 
 	if id == 0 {
 		t.log.Error(op, zap.Error(model.ErrInvalidID))
+
 		return model.ErrInvalidID
 	}
 
@@ -159,19 +195,24 @@ func (t *Task) Delete(ctx context.Context, id int) error {
 		ToSql()
 	if err != nil {
 		t.log.Error(op, zap.Error(err))
+
 		return fmt.Errorf("%s : %w", op, err)
 	}
 
 	cmdTag, err := t.storage.Pool.Exec(ctx, query, args...)
 	if cmdTag.RowsAffected() == 0 {
 		t.log.Error(op, zap.Error(fmt.Errorf("%w with id %d", model.ErrNotFound, id)))
+
 		return model.ErrNotFound
 	}
+
 	if err != nil {
 		t.log.Error(op, zap.Error(err))
+
 		return fmt.Errorf("%s : %w", op, err)
 	}
 
 	t.log.Info(fmt.Sprintf("%s : deleted %d task with id %d", op, cmdTag.RowsAffected(), id))
+
 	return nil
 }

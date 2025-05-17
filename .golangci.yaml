@@ -1,0 +1,50 @@
+version: "2"
+run:
+  issues-exit-code: 1
+linters:
+  default: all
+  disable:
+    - exhaustruct
+    - depguard
+    - tagalign
+    - godox
+    - varnamelen
+    - wrapcheck
+    - funlen
+  settings:
+    revive:
+      severity: warning
+    staticcheck:
+      checks:
+        - all
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - _test.go$
+      - .gen.go$
+      - third_party$
+      - builtin$
+      - examples$
+      - gen$
+formatters:
+  enable:
+    - golines
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+    gofumt:
+      extra-rules: true
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+      - gen$
+      - .gen.go$

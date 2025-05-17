@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 )
@@ -40,15 +41,16 @@ func New() Config {
 	}
 }
 
-func (cfg *databaseConfig) DatabaseUrl() string {
+func (cfg *databaseConfig) DatabaseURL() string {
 	encodedPassword := url.QueryEscape(cfg.Password)
 
+	hostPort := net.JoinHostPort(cfg.Host, cfg.Port)
+
 	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		"postgres://%s:%s@%s/%s?sslmode=%s",
 		cfg.User,
 		encodedPassword,
-		cfg.Host,
-		cfg.Port,
+		hostPort,
 		cfg.DBName,
 		cfg.SSLMode,
 	)
@@ -58,5 +60,6 @@ func getEnv(key, defaultValue string) string {
 	if value, exists := os.LookupEnv(key); exists && value != "" {
 		return value
 	}
+
 	return defaultValue
 }

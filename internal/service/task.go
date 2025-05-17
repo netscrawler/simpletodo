@@ -32,6 +32,7 @@ func New(
 
 func (t *TaskService) Create(ctx context.Context, title string) error {
 	task := model.NewTask(title)
+
 	return t.repository.Create(ctx, task)
 }
 

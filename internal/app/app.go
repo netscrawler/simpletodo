@@ -2,17 +2,24 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"time"
+
 	"simpletodo/internal/config"
 	"simpletodo/internal/http-server/handlers"
 	"simpletodo/internal/repository"
 	"simpletodo/internal/service"
 	"simpletodo/internal/storage/postgres"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+)
+
+const (
+	defaultTimeOut      = 5 * time.Second
+	defaultServeTimeOut = 15 * time.Second
 )
 
 type App struct {
@@ -24,18 +31,22 @@ type App struct {
 
 func NewApp(log *zap.Logger, cfg config.Config) *App {
 	return &App{
-		log: log,
-		cfg: cfg,
+		log:    log,
+		cfg:    cfg,
+		router: nil,
+		db:     nil,
 	}
 }
 
 func (a *App) Run() {
 	const op = "app.Run"
-	a.log.Info(fmt.Sprintf("%s : starting application", op))
+
+	a.log.Info(op + " : starting application")
 
 	a.db = postgres.New(a.log)
 	ctx := context.Background()
-	err := a.db.Init(ctx, a.cfg.Database.DatabaseUrl())
+
+	err := a.db.Init(ctx, a.cfg.Database.DatabaseURL())
 	if err != nil {
 		a.log.Fatal("failed to connect to the database", zap.Error(err))
 	}
@@ -46,12 +57,25 @@ func (a *App) Run() {
 	th := handlers.NewTaskHandler(tService)
 	r := gin.Default()
 	r = a.setupRoutes(r, th)
-	a.router = &http.Server{Addr: fmt.Sprintf("%s:%s", a.cfg.Server.Host, a.cfg.Server.Port), Handler: r}
+	a.router = &http.Server{
+		Addr:              fmt.Sprintf("%s:%s", a.cfg.Server.Host, a.cfg.Server.Port),
+		Handler:           r,
+		ReadHeaderTimeout: defaultServeTimeOut,
+	}
 
-	a.log.Info(fmt.Sprintf("%s : application started", op))
+	a.log.Info(op + " : application started")
+
 	go func() {
-		a.log.Info(fmt.Sprintf("%s : starting server on host %s and port %s", op, a.cfg.Server.Host, a.cfg.Server.Port))
-		if err := a.router.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		a.log.Info(
+			fmt.Sprintf(
+				"%s : starting server on host %s and port %s",
+				op,
+				a.cfg.Server.Host,
+				a.cfg.Server.Port,
+			),
+		)
+
+		if err := a.router.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			a.log.Fatal("failed to start server", zap.Error(err))
 		}
 	}()
@@ -59,15 +83,17 @@ func (a *App) Run() {
 
 func (a *App) GracefulShutdown() {
 	const op = "app.GracefulShutdown"
-	a.log.Info(fmt.Sprintf("%s : shutting down application", op))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	a.log.Info(op + " : shutting down application")
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeOut)
 	defer cancel()
+
 	if err := a.router.Shutdown(ctx); err != nil {
-		a.log.Error(fmt.Sprintf("%s : Server forced to shutdown", op), zap.Error(err))
+		a.log.Error(op+" : Server forced to shutdown", zap.Error(err))
 	}
 
-	a.log.Info(fmt.Sprintf("%s : application stopped", op))
+	a.log.Info(op + " : application stopped")
 }
 
 func (a *App) setupRoutes(r *gin.Engine, th *handlers.TaskHandler) *gin.Engine {
@@ -79,5 +105,6 @@ func (a *App) setupRoutes(r *gin.Engine, th *handlers.TaskHandler) *gin.Engine {
 	r.GET("/gettaskupdateform/:id", th.GetTaskUpdateForm)
 	r.PUT("/tasks/:id", th.UpdateTask)
 	r.DELETE("/tasks/:id", th.DeleteTask)
+
 	return r
 }

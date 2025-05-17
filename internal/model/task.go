@@ -6,6 +6,7 @@ type Task struct {
 	Done  bool   `json:"done"`
 }
 
+//nolint:exhaustruct
 func NewTask(title string) *Task {
 	return &Task{Title: title, Done: false}
 }

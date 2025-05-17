@@ -2,4 +2,4 @@ package storage
 
 import "errors"
 
-var ErrorDbConnection = errors.New("failed to connect to database")
+var ErrDBConn = errors.New("failed to connect to database")
